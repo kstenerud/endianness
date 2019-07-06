@@ -41,6 +41,8 @@ __BYTE_ORDER__ ==  __ORDER_LITTLE_ENDIAN__
 
 // ===========================================================================
 
+#define INVERSE_ENDIAN_INDEX(TOTAL_SIZE, INDEX) ((TOTAL_SIZE) - (INDEX) - 1)
+
 // Get an index into a value whose address has been cast to a byte pointer.
 //
 // These macros will always return the same index value, regardless of
@@ -55,7 +57,7 @@ __BYTE_ORDER__ ==  __ORDER_LITTLE_ENDIAN__
 //     printf("%02x, ", ptr[INDEX_BE(sizeof(value), 0)]);
 //     printf("%02x\n", ptr[INDEX_LE(sizeof(value), 0)]);
 #define INDEX_BE(TOTAL_SIZE, INDEX) (INDEX)
-#define INDEX_LE(TOTAL_SIZE, INDEX) ((TOTAL_SIZE) - (INDEX) - 1)
+#define INDEX_LE(TOTAL_SIZE, INDEX) INVERSE_ENDIAN_INDEX(TOTAL_SIZE, INDEX)
 
 
 // ===========================================================================
