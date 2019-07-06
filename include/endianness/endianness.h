@@ -98,10 +98,10 @@ __BYTE_ORDER__ ==  __ORDER_LITTLE_ENDIAN__
 // The function will be named read_[NAME]
 // Endianness is BE or LE
 #define DEFINE_ENDIAN_READ_FUNCTION(NAME, TYPE, ENDIAN) \
-static inline TYPE read_ ## NAME(uint8_t* src) \
+static inline TYPE read_ ## NAME(const uint8_t*const src) \
 { \
     TYPE value = 0; \
-    uint8_t* dst = (uint8_t*)&value; \
+    uint8_t*const dst = (uint8_t*const)&value; \
     for(unsigned i = 0; i < sizeof(value); i++) \
     { \
         dst[INDEX_HB(sizeof(value), i)] = src[INDEX_ ## ENDIAN(sizeof(value), i)]; \
@@ -113,9 +113,9 @@ static inline TYPE read_ ## NAME(uint8_t* src) \
 // The function will be named write_[NAME]
 // Endianness is BE or LE
 #define DEFINE_ENDIAN_WRITE_FUNCTION(NAME, TYPE, ENDIAN) \
-static inline void write_ ## NAME(TYPE value, uint8_t* dst) \
+static inline void write_ ## NAME(const TYPE value, uint8_t*const dst) \
 { \
-    uint8_t* src = (uint8_t*)&value; \
+    const uint8_t*const src = (const uint8_t*const)&value; \
     for(unsigned i = 0; i < sizeof(value); i++) \
     { \
         dst[INDEX_ ## ENDIAN(sizeof(value), i)] = src[INDEX_HB(sizeof(value), i)]; \
