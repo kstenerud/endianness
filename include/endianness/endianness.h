@@ -91,57 +91,90 @@ __BYTE_ORDER__ ==  __ORDER_LITTLE_ENDIAN__
 
 // ===========================================================================
 
+// Primitives for copying arbitrary data in big endian and little endian order.
+// These have performance similar to memcpy for small sizes (64 bits and smaller).
+
+#include <stdint.h>
+#include <string.h>
+
+static inline void copy_swapped_endian(const void*const __restrict__ src, void*const __restrict__ dst, const int length)
+{
+    uint8_t* __restrict__ dstp = (uint8_t*)dst;
+    const uint8_t*const __restrict__ srce = (const uint8_t*)src;
+    const uint8_t* __restrict__ srcp = srce + length;
+
+    while(srcp > srce)
+    {
+        *dstp++ = *--srcp;
+    }
+}
+
+static inline void copy_le(const void*const __restrict__ src, void*const __restrict__ dst, const int length)
+{
+#if BYTE_ORDER_IS_LITTLE_ENDIAN
+    memcpy(dst, src, length);
+#else
+    copy_swapped_endian(src, dst, length);
+#endif
+}
+
+static inline void copy_be(const void*const __restrict__ src, void*const __restrict__ dst, const int length)
+{
+#if BYTE_ORDER_IS_BIG_ENDIAN
+    memcpy(dst, src, length);
+#else
+    copy_swapped_endian(src, dst, length);
+#endif
+}
+
+
+// ===========================================================================
+
 // Code generators for reading and writing multibyte values in
 // big and little endian order.
 
-#include <stdint.h>
-
 // Generate a reader function for TYPE, of the specified endianness.
-// The function will be named read_[NAME]
-// Endianness is BE or LE
+// The function will be named read_[NAME]_[ENDIAN]
+// Endianness is be or le
 #define DEFINE_ENDIAN_READ_FUNCTION(NAME, TYPE, ENDIAN) \
-static inline TYPE read_ ## NAME(const uint8_t*const src) \
+static inline TYPE read_ ## NAME ## _ ## ENDIAN(const uint8_t*const src) \
 { \
     TYPE value = 0; \
-    uint8_t*const dst = (uint8_t*const)&value; \
-    for(unsigned i = 0; i < sizeof(value); i++) \
-    { \
-        dst[INDEX_HB(sizeof(value), i)] = src[INDEX_ ## ENDIAN(sizeof(value), i)]; \
-    } \
+    copy_ ## ENDIAN(src, &value, sizeof(value)); \
     return value; \
 }
 
 // Generate a writer function for TYPE, of the specified endianness.
-// The function will be named write_[NAME]
-// Endianness is BE or LE
+// The function will be named write_[NAME]_[ENDIAN]
+// Endianness is be or le
 #define DEFINE_ENDIAN_WRITE_FUNCTION(NAME, TYPE, ENDIAN) \
-static inline void write_ ## NAME(const TYPE value, uint8_t*const dst) \
+static inline void write_ ## NAME ## _ ## ENDIAN(const TYPE value, uint8_t*const dst) \
 { \
-    const uint8_t*const src = (const uint8_t*const)&value; \
-    for(unsigned i = 0; i < sizeof(value); i++) \
-    { \
-        dst[INDEX_ ## ENDIAN(sizeof(value), i)] = src[INDEX_HB(sizeof(value), i)]; \
-    } \
+    copy_ ## ENDIAN(&value, dst, sizeof(value)); \
 }
 
 // Generate a reader and writer function for TYPE, of the specified endianness.
-// The functions will be named read_[NAME] and write_[NAME]
-// Endianness is BE or LE
+// The functions will be named read_[NAME]_[ENDIAN] and write_[NAME]_[ENDIAN]
+// Endianness is be or le
 #define DEFINE_ENDIAN_READ_WRITE_FUNCTIONS(NAME, TYPE, ENDIAN) \
 DEFINE_ENDIAN_READ_FUNCTION(NAME, TYPE, ENDIAN) \
 DEFINE_ENDIAN_WRITE_FUNCTION(NAME, TYPE, ENDIAN)
 
 // Generate reader and writer functions for TYPE, for both endianness.
-// The functions will be named read_[NAME_BASE]_be, read_[NAME_BASE]_le,
-// write_[NAME_BASE]_le, write_[NAME_BASE]_be
-#define DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(NAME_BASE, TYPE) \
-DEFINE_ENDIAN_READ_WRITE_FUNCTIONS(NAME_BASE ## _le, TYPE, LE) \
-DEFINE_ENDIAN_READ_WRITE_FUNCTIONS(NAME_BASE ## _be, TYPE, BE)
+// The functions will be named:
+//  * read_[NAME]_be
+//  * read_[NAME]_le
+//  * write_[NAME]_le
+//  * write_[NAME]_be
+#define DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(NAME, TYPE) \
+DEFINE_ENDIAN_READ_WRITE_FUNCTIONS(NAME, TYPE, le) \
+DEFINE_ENDIAN_READ_WRITE_FUNCTIONS(NAME, TYPE, be)
 
 
 // ===========================================================================
 
 // Default integer and float read/write functions
+// They will look like: read_uint32_le(), write_uint16_be(), etc
 
 DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(int16, int16_t)
 DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(uint16, uint16_t)
@@ -150,7 +183,13 @@ DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(uint32, uint32_t)
 DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(int64, int64_t)
 DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(uint64, uint64_t)
 
-// Float sizes can only be guaranteed if __STDC_IEC_559__ is set.
+// Note: 128 bit accessors not included because they're not ISO C yet.
+// But you can easily define accessors for them (or any type):
+//     DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(int128, __int128)
+//     DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(uint128, unsigned __int128)
+
+
+// Float sizes can only be guaranteed if __STDC_IEC_559__ is defined.
 #include <math.h>
 #ifdef __STDC_IEC_559__
     DEFINE_ENDIAN_READ_WRITE_FUNCTION_SET(float32, float)
